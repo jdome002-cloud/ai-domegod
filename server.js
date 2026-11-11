@@ -138,9 +138,18 @@ app.post("/api/chat", chatLimiter, async (req, res) => {
 
     if (!upstream.ok) {
       console.error("openai_error", upstream.status);
-      return res.status(502).json({
+      let content = "ขออภัย ตอนนี้บริการ AI ตอบไม่ได้ กรุณาลองใหม่อีกครั้งครับ";
+      let status = 502;
+      if (upstream.status === 429) {
+        status = 200;
+        content = "บัญชี OpenAI โควต้าหมดหรือยังไม่มีเครดิตครับ ไปเติมที่ platform.openai.com แล้วลองใหม่";
+      } else if (upstream.status === 401 || upstream.status === 403) {
+        status = 200;
+        content = "OpenAI key ไม่ถูกต้องหรือถูกยกเลิกแล้วครับ";
+      }
+      return res.status(status).json({
         role: "assistant",
-        content: "ขออภัย ตอนนี้บริการ AI ตอบไม่ได้ กรุณาลองใหม่อีกครั้งครับ",
+        content,
       });
     }
 
