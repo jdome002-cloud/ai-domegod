@@ -7,11 +7,15 @@ const rateLimit = require("express-rate-limit");
 
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC_DIR = path.join(__dirname, "public");
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
-const DEFAULT_MODEL = "gpt-4o-mini";
+// llama-3.3-70b-versatile was retired for Groq free/developer accounts on 2026-08-16.
+// Official recommended free replacement: openai/gpt-oss-120b (override with GROQ_MODEL).
+const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
+const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 const MAX_MESSAGES = 30;
 const MAX_CONTENT = 8000;
-const OPENAI_TIMEOUT_MS = 60_000;
+const AI_TIMEOUT_MS = 60_000;
 
 const SYSTEM_PROMPT = [
   "คุณคือ AI DOMEgod ผู้ช่วยอัจฉริยะที่พูดภาษาไทยเป็นหลัก",
@@ -21,6 +25,67 @@ const SYSTEM_PROMPT = [
   "อธิบายสั้นกระชับ แล้วตามด้วยโค้ดที่นำไปใช้ได้เลย",
   "ถ้าไม่แน่ใจ ให้บอกตามตรง ไม่ต้องแต่งข้อมูล",
 ].join("\n");
+
+function requestedProvider() {
+  return String(process.env.AI_PROVIDER || "groq").trim().toLowerCase();
+}
+
+// Groq is the default. OPENAI_API_KEY is used only when GROQ_API_KEY is unset
+// and AI_PROVIDER=openai. Never log or return the key itself.
+function resolveAi() {
+  const groqKey = process.env.GROQ_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
+  const requested = requestedProvider();
+
+  if (groqKey) {
+    return {
+      provider: "groq",
+      apiKey: groqKey,
+      url: GROQ_URL,
+      model: process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL,
+    };
+  }
+
+  if (requested === "openai" && openaiKey) {
+    return {
+      provider: "openai",
+      apiKey: openaiKey,
+      url: OPENAI_URL,
+      model: process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL,
+    };
+  }
+
+  const provider = requested === "openai" ? "openai" : "groq";
+  return {
+    provider,
+    apiKey: null,
+    url: provider === "openai" ? OPENAI_URL : GROQ_URL,
+    model: provider === "openai"
+      ? (process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL)
+      : (process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL),
+  };
+}
+
+function missingKeyMessage(provider) {
+  if (provider === "openai") {
+    return "ยังไม่ได้ตั้งค่า AI (ต้องใส่ OPENAI_API_KEY)";
+  }
+  return "ยังไม่ได้ตั้งค่า AI ฟรี (ต้องใส่ GROQ_API_KEY) รับ key ได้ที่ console.groq.com";
+}
+
+function upstreamErrorMessage(provider, status) {
+  if (status === 429) {
+    return provider === "groq"
+      ? "บัญชี Groq โควต้าหมดครับ รอสักครู่หรือตรวจที่ console.groq.com แล้วลองใหม่"
+      : "บัญชี OpenAI โควต้าหมดหรือยังไม่มีเครดิตครับ ไปเติมที่ platform.openai.com แล้วลองใหม่";
+  }
+  if (status === 401 || status === 403) {
+    return provider === "groq"
+      ? "Groq key ไม่ถูกต้องหรือถูกยกเลิกแล้วครับ"
+      : "OpenAI key ไม่ถูกต้องหรือถูกยกเลิกแล้วครับ";
+  }
+  return "ขออภัย ตอนนี้บริการ AI ตอบไม่ได้ กรุณาลองใหม่อีกครั้งครับ";
+}
 
 const app = express();
 app.disable("x-powered-by");
@@ -111,42 +176,35 @@ app.post("/api/chat", chatLimiter, async (req, res) => {
     });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+  const ai = resolveAi();
+  if (!ai.apiKey) {
     return res.status(200).json({
       role: "assistant",
-      content: "ยังไม่ได้ตั้งค่า AI (ต้องใส่ OPENAI_API_KEY)",
+      content: missingKeyMessage(ai.provider),
     });
   }
 
-  const model = process.env.OPENAI_MODEL || DEFAULT_MODEL;
-
   try {
-    const upstream = await fetch(OPENAI_URL, {
+    const upstream = await fetch(ai.url, {
       method: "POST",
       headers: {
-        Authorization: "Bearer " + apiKey,
+        Authorization: "Bearer " + ai.apiKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model,
+        model: ai.model,
         temperature: 0.7,
         messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
       }),
-      signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
+      signal: AbortSignal.timeout(AI_TIMEOUT_MS),
     });
 
     if (!upstream.ok) {
-      console.error("openai_error", upstream.status);
-      let content = "ขออภัย ตอนนี้บริการ AI ตอบไม่ได้ กรุณาลองใหม่อีกครั้งครับ";
-      let status = 502;
-      if (upstream.status === 429) {
-        status = 200;
-        content = "บัญชี OpenAI โควต้าหมดหรือยังไม่มีเครดิตครับ ไปเติมที่ platform.openai.com แล้วลองใหม่";
-      } else if (upstream.status === 401 || upstream.status === 403) {
-        status = 200;
-        content = "OpenAI key ไม่ถูกต้องหรือถูกยกเลิกแล้วครับ";
-      }
+      console.error(ai.provider + "_error", upstream.status);
+      const content = upstreamErrorMessage(ai.provider, upstream.status);
+      const status = upstream.status === 429 || upstream.status === 401 || upstream.status === 403
+        ? 200
+        : 502;
       return res.status(status).json({
         role: "assistant",
         content,
@@ -162,7 +220,7 @@ app.post("/api/chat", chatLimiter, async (req, res) => {
       data.choices[0].message.content;
 
     if (!content || typeof content !== "string") {
-      console.error("openai_empty");
+      console.error(ai.provider + "_empty");
       return res.status(502).json({
         role: "assistant",
         content: "ขออภัย ตอนนี้บริการ AI ตอบไม่ได้ กรุณาลองใหม่อีกครั้งครับ",
@@ -174,7 +232,7 @@ app.post("/api/chat", chatLimiter, async (req, res) => {
       content,
     });
   } catch (err) {
-    console.error("openai_fail", err && err.name);
+    console.error(ai.provider + "_fail", err && err.name);
     return res.status(502).json({
       role: "assistant",
       content: "ขออภัย เชื่อมต่อบริการ AI ไม่สำเร็จ กรุณาลองใหม่อีกครั้งครับ",
@@ -228,6 +286,7 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  const ready = process.env.OPENAI_API_KEY ? "configured" : "not-configured";
-  console.log(`AI DOMEgod listening on ${PORT} (openai: ${ready})`);
+  const ai = resolveAi();
+  const ready = ai.apiKey ? "configured" : "not-configured";
+  console.log(`AI DOMEgod listening on ${PORT} (provider: ${ai.provider}, key: ${ready})`);
 });

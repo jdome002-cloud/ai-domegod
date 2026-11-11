@@ -1,6 +1,6 @@
 # AI DOMEgod — Render Blueprint (free web service)
-# After the first deploy, set OPENAI_API_KEY in the Render dashboard.
-# Do not put the key in this file.
+# After the first deploy, set GROQ_API_KEY in the Render dashboard
+# (get a free key at https://console.groq.com). Do not put keys in this file.
 
 services:
   - type: web
@@ -14,7 +14,14 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: AI_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      # Optional OpenAI fallback (used only if GROQ_API_KEY is unset and AI_PROVIDER=openai)
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
-        value: gpt-4o-mini
+        sync: false
