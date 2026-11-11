@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>AI DOMEgod</title>
+  <meta name="description" content="แชท AI เขียนโค้ดและช่วยงานทั่วไป ติดตั้งลงหน้าจอได้" />
+  <meta name="theme-color" content="#07080c" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="DOMEgod" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="application-name" content="AI DOMEgod" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180.png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <div class="brand">
+        <img class="brand-icon" src="/icons/icon-192.png" alt="" width="36" height="36" />
+        <div class="brand-text">
+          <h1>AI DOMEgod</h1>
+          <p>ผู้ช่วยเขียนโค้ดและคุยได้ทุกอย่าง</p>
+        </div>
+      </div>
+      <button type="button" id="new-chat" class="btn-ghost" aria-label="เริ่มแชทใหม่">แชทใหม่</button>
+    </header>
+
+    <div id="install-hint" class="install-hint" hidden>
+      <p>เปิดใน Safari แล้วกดแชร์ → <strong>เพิ่มไปยังหน้าจอโฮม</strong> เพื่อใช้แบบแอปเต็มจอ</p>
+      <button type="button" id="dismiss-hint" class="btn-ghost btn-tiny" aria-label="ปิดคำแนะนำ">ปิด</button>
+    </div>
+
+    <main id="thread" class="thread" aria-live="polite">
+      <div id="empty" class="empty">
+        <img src="/icons/icon-192.png" alt="" width="72" height="72" />
+        <h2>สวัสดีครับ ผมคือ AI DOMEgod</h2>
+        <p>ช่วยเขียนโค้ด อธิบายบั๊ก และคุยงานทั่วไปได้เลย พิมพ์ข้อความด้านล่างได้ครับ</p>
+      </div>
+    </main>
+
+    <form id="composer" class="composer" autocomplete="off">
+      <label class="sr-only" for="input">ข้อความ</label>
+      <textarea id="input" rows="1" placeholder="พิมพ์ข้อความ..." enterkeyhint="send" maxlength="8000"></textarea>
+      <button type="submit" id="send" class="send" disabled aria-label="ส่ง">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path fill="currentColor" d="M3.4 20.6 21 12 3.4 3.4 3 10l11 2L3 14z" />
+        </svg>
+      </button>
+    </form>
+  </div>
+
+  <script src="/markdown.js"></script>
+  <script src="/app.js"></script>
+  <script src="/pwa.js"></script>
+</body>
+</html>

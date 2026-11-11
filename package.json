@@ -1,0 +1,21 @@
+{
+  "name": "ai-domegod",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI DOMEgod — แชท AI เขียนโค้ดและช่วยงานทั่วไป ติดตั้งลงหน้าจอได้",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "type": "commonjs",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.3",
+    "helmet": "^8.3.0"
+  }
+}
